@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import scipy.sparse.linalg
 from scipy import io
 import scipy.sparse as sp
+from scipy.optimize import lsq_linear
 
 """
 A = np.zeros((5,5))
@@ -222,11 +223,9 @@ def givens_rotations(H,m,betas):
     #omega = np.eye(m)
     g = np.zeros(m+1)
     g[0] = betas[0]
-    print('H', H)
-    print('m', m)
+    print('Doing Givens rotations')
 
     for j in range(m-1):
-        print('givens j', j)
         omega = np.eye(j+1)
         s = H[j,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
         c = H[j-1,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
@@ -256,7 +255,6 @@ def new_GMRES_with_rotations(A,b,m,tol):
 
     while end_not_reached:
         for j in range(m):
-            print('j', j)
             w = A.dot(V[:,j])
 
             for i in range(j+1):
@@ -277,8 +275,6 @@ def new_GMRES_with_rotations(A,b,m,tol):
         x_m = V[:,:-1].dot(y_m)
         return x_m, y_m, m
 
-    print('m', m)
-    print('H[:m,:m]', H[:m,:m])
     y_m = np.linalg.solve(H[:m,:m], betas[:m])
     x_m = V[:-1].dot(y_m)
     return x_m, y_m, m
@@ -348,7 +344,6 @@ def GMRES_with_rotations2(A,b,x0,m,iterations):
 
 
 
-x_m, y_m, m = new_GMRES_with_rotations(A, b, 200, 1E-8)
-print(x_m, iter)
-print('residual was', np.linalg.norm(A.todense()-b.dot(x_m)))
+x_m, y_m, m = new_GMRES_with_rotations(A, b, 200, 1E-18)
+print('residual was', np.linalg.norm((A.todense()).dot(x_m)-b))
 
