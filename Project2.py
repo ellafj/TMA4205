@@ -45,7 +45,7 @@ def GMRES(A, b, x0):
             plt.spy(H)
             #plt.show()
             #break
-            return H
+            return H, beta
 
         if j != j-1:
             H[j+1,j] = h
@@ -54,10 +54,13 @@ def GMRES(A, b, x0):
         print('H',H)
         j += 1
 
-H = GMRES(A,b,x0)
+H, beta = GMRES(A,b,x0)
 
-def givens_rotations(H, m):
-    #identity = np.eye(m+1)
+def givens_rotations(H, beta, m):
+    m = len(A)
+    r0 = b - A.dot(x0)
+    beta = np.linalg.norm(r0,2)
+
     submatrix = np.zeros((2,2))
     s1 = H[1,0]/np.sqrt(H[0,0]**2+H[1,0]**2)
     c1 = H[0,0]/np.sqrt(H[0,0]**2+H[1,0]**2)
@@ -65,17 +68,24 @@ def givens_rotations(H, m):
     submatrix[1,0] = -s1
     submatrix[0,0] = c1
     submatrix[1,1] = c1
+
+    g = np.zeros(m+1)
+    g[0] = beta
+
     H_list = [H]
+    g_list = [g]
 
     for i in range(m):
         omega = np.eye(m+1)
         omega[i:i+2,i:i+2] = submatrix
         print(H[i])
         H_list.append(omega.dot(H_list[i]))
+        g_list.append(omega.dot(g_list[i]))
     print('H_list', H_list)
+    print('g_list', g_list)
 
 
 
 
-givens_rotations(H,5)
+givens_rotations(H, beta, 5)
 
