@@ -19,8 +19,8 @@ b = np.zeros(5)
 b[0] = 1"""
 
 A = scipy.io.mmread('add32.mtx')
-b = scipy.io.mmread('add32_rhs1.mtx')
-x0 = np.zeros((A.shape[0],1))
+b = np.reshape(scipy.io.mmread('add32_rhs1.mtx'), A.shape[0])
+x0 = np.zeros(A.shape[0])
 print(x0)
 
 def givens_rotations(H, m, r0, beta):
@@ -37,8 +37,16 @@ def givens_rotations(H, m, r0, beta):
     g_list = [g]
 
     for i in range(m-1):
-        s1 = H[i+1,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
-        c1 = H[i,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        s1_under = np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        if s1_under == 0:
+            s1 = 0
+        else:
+            s1 = H[i+1,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        c1_under = np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        if c1_under == 0:
+            c1 = 0
+        else:
+            c1 = H[i,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
         submatrix[0,1] = s1
         submatrix[1,0] = -s1
         submatrix[0,0] = c1
@@ -46,7 +54,7 @@ def givens_rotations(H, m, r0, beta):
 
         omega = np.eye(m+1)
         omega[i:i+2,i:i+2] = submatrix
-        print(H[i])
+        print('H[i]', H[i])
         H_list.append(omega.dot(H_list[i]))
         g_list.append(omega.dot(g_list[i]))
 
@@ -87,11 +95,11 @@ def GMRES(A, b, x0):
 
         if int(h) == 0:
             print('Found H')
-            print(m)
-            print(H)
-            plt.spy(H)
+            print('m', m)
+            H[H < 10**(-10)] = 0
+            print('H', H)
+            #plt.spy(H)
             #plt.show()
-            #break
             R_m, g_m = givens_rotations(H, m, r0, beta)
             y_m = np.linalg.solve(R_m, g_m)
             x_m = x0 + V[:-1].dot(y_m)
