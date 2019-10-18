@@ -5,7 +5,7 @@ import scipy.sparse.linalg
 from scipy import io
 import scipy.sparse as sp
 
-
+"""
 A = np.zeros((5,5))
 for i in range(5):
     if i == 0:
@@ -21,11 +21,12 @@ b[0] = 1
 
 A = scipy.io.mmread('add32.mtx')
 b = np.reshape(scipy.io.mmread('add32_rhs1.mtx'), A.shape[0])
-"""
+
+
 x0 = np.zeros(A.shape[0])
 print(x0)
 
-def givens_rotations(H, m, r0, beta):
+def old_givens_rotations(H, m, r0, beta):
     #m = scipy.sparse.csr_matrix.getnnz(A) #len(A)
     #r0 = b - A.dot(x0)
     #beta = np.linalg.norm(r0,2)
@@ -39,29 +40,48 @@ def givens_rotations(H, m, r0, beta):
     g_list = [g]
 
     for i in range(m-1):
-        s1_under = np.sqrt(H[i,i]**2+H[i+1,i]**2)
-        if s1_under == 0:
-            s1 = 0
+        s_under = np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        if s_under == 0:
+            s = 0
         else:
-            s1 = H[i+1,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
-        c1_under = np.sqrt(H[i,i]**2+H[i+1,i]**2)
-        if c1_under == 0:
-            c1 = 0
+            s = H[i+1,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        c_under = np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        if c_under == 0:
+            c = 0
         else:
-            c1 = H[i,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
-        submatrix[0,1] = s1
-        submatrix[1,0] = -s1
-        submatrix[0,0] = c1
-        submatrix[1,1] = c1
+            c = H[i,i]/np.sqrt(H[i,i]**2+H[i+1,i]**2)
+        submatrix[0,1] = s
+        submatrix[1,0] = -s
+        submatrix[0,0] = c
+        submatrix[1,1] = c
 
         omega = np.eye(m+1)
         omega[i:i+2,i:i+2] = submatrix
-        print('H[i]', H[i])
-        H_list.append(omega.dot(H_list[i]))
-        g_list.append(omega.dot(g_list[i]))
 
-    R_m = H_list[-1]
-    g_m = g_list[-1]
+        H = omega.dot(H_list[i])
+        g = omega.dot(g_list[i])
+
+        H_list.append(H)
+        g_list.append(g)
+    """
+    for j in range(m):
+        print(j)
+        omega = np.eye(j+1)
+        s = H[j,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
+        c = H[j-1,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
+        omega[j-1,j] = s
+        omega[j,j-1] = -s
+        omega[j-1,j-1] = c
+        omega[j,j] = c
+        #print('omega', omega)
+        #print('H', H)
+
+        H[:j+1, :j] = omega.dot(H[:j+1,:j])
+        g[:j+1] = omega.dot(g[:j+1])
+        """
+
+    R_m = H
+    g_m = g
 
     return R_m[:-1], g_m[:-1]
 
@@ -69,15 +89,15 @@ def GMRES(A, b, x0):
     m = A.shape[0]
     j = 0
 
-    r0 = b - A *x0
+    r0 = b - A.dot(x0)
     beta = np.linalg.norm(r0,2)
     end_not_reached = True
 
     V = np.zeros((m+1,m))
+    print('r0', r0)
     V[0] = r0/beta
     w = []
     H = np.zeros((m+1,m))
-
 
     while end_not_reached:
         print('j', j)
@@ -92,10 +112,11 @@ def GMRES(A, b, x0):
         if int(h) == 0:
             print('Found H')
             print('m', m)
-            H[H < 10**(-10)] = 0
+            #H[H < 10**(-10)] = 0
             print('H', H)
             #plt.spy(H)
             #plt.show()
+            R_m, g_m = givens_rotations(H, m, r0, beta)
             y_m = np.linalg.solve(R_m, g_m)
             x_m = x0 + V[:-1].dot(y_m)
             return x_m, y_m
@@ -113,7 +134,7 @@ def GMRES(A, b, x0):
 
 print('x', sc.sparse.linalg.gmres(A, b, x0))
 
-def GMRES_with_rotations(A,b,x0):
+def GMRES_with_rotations(A,b,x0,tol):
     m = A.shape[0]
     iter = 0
 
@@ -145,25 +166,33 @@ def GMRES_with_rotations(A,b,x0):
 
             if j > 0:
                 omega = np.eye(j+1)
-                s = H[j,j-1]/np.sqrt(H[j-1,j-1]**2+H[j,j-1]**2)
-                c = H[j-1,j-1]/np.sqrt(H[j-1,j-1]**2+H[j,j-1]**2)
+
+                s = H[j,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
+                c = H[j-1,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
                 omega[j-1,j] = s
                 omega[j,j-1] = -s
                 omega[j-1,j-1] = c
                 omega[j,j] = c
                 print('omega', omega)
+                print('H', H)
 
+                print('H[:j+1, :j]', H[:j+1, :j])
+                print('H[:j+1,:j]', H[:j+1,:j])
                 H[:j+1, :j] = omega.dot(H[:j+1,:j])
                 g[:j+1] = omega.dot(g[:j+1])
+                print('new H', H)
 
-            if int(h) == 0:
+            if int(h) < tol: # == 0:
+                H[j+1,j] = h
                 print('Found H')
                 print('m', m)
                 H[H < 10**(-10)] = 0
+                H[j,j] = 1
                 print('H', H)
+
                 #plt.spy(H)
                 #plt.show()
-
+                print('H[:-1]', H[:-1])
                 y_m = np.linalg.solve(H[:-1], g[:-1])
                 x_m = x0 + V[:-1].dot(y_m)
                 return x_m, y_m
@@ -186,6 +215,77 @@ def GMRES_with_rotations(A,b,x0):
             print('H',H)
 
         iter += 1
+
+
+
+def givens_rotations(H,m,betas):
+    #omega = np.eye(m)
+    g = np.zeros(m+1)
+    g[0] = betas[0]
+    print('H', H)
+    print('m', m)
+
+    for j in range(m-1):
+        print('givens j', j)
+        omega = np.eye(j+1)
+        s = H[j,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
+        c = H[j-1,j-1]/np.sqrt(H[j-1,j-1]**2 + H[j,j-1]**2)
+        omega[j-1,j] = s
+        omega[j,j-1] = -s
+        omega[j-1,j-1] = c
+        omega[j,j] = c
+        #print('omega', omega)
+        #print('H', H)
+
+        H[:j+1, :j] = omega.dot(H[:j+1,:j])
+        g[:j+1] = omega.dot(g[:j+1])
+
+    return H[:-1], g[:-1]
+
+def new_GMRES_with_rotations(A,b,m,tol):
+    n = A.shape[0]
+    x0 = np.zeros(n)
+    r0 = b - A.dot(x0)
+    beta = np.linalg.norm(r0,2)
+    betas = np.zeros(n)
+    betas[0] = beta
+    H = np.zeros((m+1,m))
+    V = np.zeros((n,m+1))
+    V[:,0] = r0/beta
+    end_not_reached = True
+
+    while end_not_reached:
+        for j in range(m):
+            print('j', j)
+            w = A.dot(V[:,j])
+
+            for i in range(j+1):
+                H[i, j] = w.dot(V[:, i])
+                w -= H[i, j]*V[:, i]
+
+            H[j+1,j] = np.linalg.norm(w,2)
+
+            if H[j+1,j] < tol:
+                print('Found a solution')
+                m = j
+                end_not_reached = False
+
+            V[:,j+1] = w/H[j+1,j]
+
+        R_m, g_m = givens_rotations(H,m,betas)
+        y_m = np.linalg.solve(R_m, g_m)
+        x_m = V[:,:-1].dot(y_m)
+        return x_m, y_m, m
+
+    print('m', m)
+    print('H[:m,:m]', H[:m,:m])
+    y_m = np.linalg.solve(H[:m,:m], betas[:m])
+    x_m = V[:-1].dot(y_m)
+    return x_m, y_m, m
+
+
+
+
 
 
 def GMRES_with_rotations2(A,b,x0,m,iterations):
@@ -248,6 +348,7 @@ def GMRES_with_rotations2(A,b,x0,m,iterations):
 
 
 
-x_m, y_m = GMRES_with_rotations(A, b, x0)
-print(x_m)
+x_m, y_m, m = new_GMRES_with_rotations(A, b, 200, 1E-8)
+print(x_m, iter)
+print('residual was', np.linalg.norm(A.todense()-b.dot(x_m)))
 
