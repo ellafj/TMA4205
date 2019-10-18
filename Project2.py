@@ -78,6 +78,7 @@ def GMRES(A, b, x0):
     w = []
     H = np.zeros((m+1,m))
 
+
     while end_not_reached:
         print('j', j)
         w.append(A.dot(V[j]))
@@ -124,6 +125,8 @@ def GMRES_with_rotations(A,b,x0):
     V[0] = r0/beta
     w = []
     H = np.zeros((m+1,m))
+    g = np.zeros(m+1)
+    g[0] = beta
 
     x_m = 0
     y_m = 0
@@ -140,6 +143,19 @@ def GMRES_with_rotations(A,b,x0):
 
             h = np.linalg.norm(w[j], 2)
 
+            if j > 0:
+                omega = np.eye(j+1)
+                s = H[j,j-1]/np.sqrt(H[j-1,j-1]**2+H[j,j-1]**2)
+                c = H[j-1,j-1]/np.sqrt(H[j-1,j-1]**2+H[j,j-1]**2)
+                omega[j-1,j] = s
+                omega[j,j-1] = -s
+                omega[j-1,j-1] = c
+                omega[j,j] = c
+                print('omega', omega)
+
+                H[:j+1, :j] = omega.dot(H[:j+1,:j])
+                g[:j+1] = omega.dot(g[:j+1])
+
             if int(h) == 0:
                 print('Found H')
                 print('m', m)
@@ -147,28 +163,25 @@ def GMRES_with_rotations(A,b,x0):
                 print('H', H)
                 #plt.spy(H)
                 #plt.show()
+
+                y_m = np.linalg.solve(H[:-1], g[:-1])
+                x_m = x0 + V[:-1].dot(y_m)
                 return x_m, y_m
+
 
             if j != j-1:
                 H[j+1,j] = h
                 V[j+1] = w[j]/H[j+1,j]
 
-            print('j', j)
-            if j > 1:
-                omega = np.eye(j+1)
-                print('omega', omega)
-                s = H[j+1,j]/np.sqrt(H[j,j]**2+H[j+1,j]**2)
-                c = H[j,j]/np.sqrt(H[j,j]**2+H[j+1,j]**2)
-                omega[j,j+1] = s
-                omega[j+1,j] = -s
-                omega[j,j] = c
-                omega[j+1,j+1] = c
 
-                H[:j+1, :j] = omega.dot(H[:j+1,:j])
-                g[:j+1] = omega.dot(g[:j+1])
+                """y_m = scipy.sparse.linalg.spsolve(H[:j,:j], g[:j])
+                print('H[:j,:j]', H[:j,:j])
+                print('g[:j]', g[:j])
+                print('x0', x0)
+                print('V[:-1]', V[:-1])
+                print('y_m', y_m)
+                x_m = x0 + V[:-1].dot(y_m)"""
 
-                y_m = scipy.sparse.linalg.spsolve(H[:j,:j], g[:j])
-                x_m = x0 + V[:-1].dot(y_m)
 
             print('H',H)
 
