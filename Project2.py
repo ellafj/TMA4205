@@ -3,11 +3,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import io
 import scipy.sparse as sp
+from scipy.sparse.linalg import gmres
 
-A = scipy.io.mmread('add32.mtx')
-b = np.reshape(scipy.io.mmread('add32_rhs1.mtx'), A.shape[0])
-
-# Function that applies givens rotations to an upper Hessenberg matrix, H
+# Function that applies Givens rotations to an upper Hessenberg matrix, H
 def givens_rotations(H, m, beta):
     # Initializing variables
     submatrix = np.zeros((2,2))
@@ -48,44 +46,21 @@ def givens_rotations(H, m, beta):
         omega[i-1:i+1,i-1:i+1] = submatrix
         H_list.append(omega.dot(H_list[i-1]))
         g_list.append(omega.dot(g_list[i-1]))
-    
+
     Rm = H_list[-1]
     gm = g_list[-1]
 
     return Rm[:-1], gm[:-1]
 
-
-def testing():
-    A = np.zeros((6,5))
-    for i in range(5):
-        if i == 0:
-            A[i,-1] = 1
-        else:
-            A[i,i-1] = 1
-    b = np.zeros(A.shape[0])
-    b[0] = 1
-    x0 = np.zeros(5)
-    r0 = b - A.dot(x0)
-    beta = np.linalg.norm(r0,2)
-    betae = np.zeros(5)
-    betae[0] = beta
-
-    H, g = old_givens_rotations(A, 5, beta)
-    print(H)
-    print(g)
-
-#testing()
-
+# Function that solves a linear system Ax = b with GMRES
 def GMRES_with_rotations(A,b,m,tol):
+    # Initializing variables
     n = A.shape[0]
     x0 = np.zeros(n)
     r0 = b - A.dot(x0)
     beta = np.linalg.norm(r0,2)
-    print('initial residual was', beta)
-
-    betae = np.zeros(n)
+    betae = np.zeros(n)                     # = beta * e_1
     betae[0] = beta
-
     H = np.zeros((m+1,m))
     V = np.zeros((n,m+1))
     V[:,0] = r0/beta
@@ -108,17 +83,31 @@ def GMRES_with_rotations(A,b,m,tol):
 
         V[:,j+1] = w/H[j+1,j]
 
+    # Checks if found exact solution
     if end_not_reached:
+        # If not, applying Given's rotations
         R_m, g_m = givens_rotations(H, m, beta)
         y_m = np.linalg.solve(R_m, g_m)
         x_m = V[:,:m].dot(y_m)
-        return x_m, y_m, m
+        return x_m, y_m
     else:
+        # Solves exact solution
         y_m = np.linalg.solve(H[:m,:m], betae[:m])
         x_m = V[:,:m].dot(y_m)
-        return x_m, y_m, m
+        return x_m, y_m
 
 
-x_m, y_m, m = GMRES_with_rotations(A, b, 500, 1E-18)
-print('residual was', np.linalg.norm((A.todense()).dot(x_m)-b))
+
+A = scipy.io.mmread('add32.mtx')
+b = np.reshape(scipy.io.mmread('add32_rhs1.mtx'), A.shape[0])
+
+m = [10, 50, 100, 150]
+tol = 1E-18
+
+plt.spy(A)
+plt.show()
+
+for i in m:
+    x_m, y_m = GMRES_with_rotations(A, b, i, tol)
+    print('The residual for m =',i,'is', np.linalg.norm((A.todense()).dot(x_m)-b))
 
