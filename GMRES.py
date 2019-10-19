@@ -64,7 +64,7 @@ def GMRES_with_rotations(A,b,m,tol):
     H = np.zeros((m+1,m))
     V = np.zeros((n,m+1))
     V[:,0] = r0/beta
-    end_not_reached = True
+    end_reached = False
 
     for j in range(m):
         w = A.dot(V[:,j])
@@ -78,24 +78,23 @@ def GMRES_with_rotations(A,b,m,tol):
         if H[j+1,j] < tol:
             print('Found a solution')
             m = j
-            end_not_reached = False
+            end_reached = True
             break
 
         V[:,j+1] = w/H[j+1,j]
 
     # Checks if found exact solution
-    if end_not_reached:
+    if end_reached:
+        # Solves exact solution
+        y_m = np.linalg.solve(H[:m,:m], betae[:m])
+        x_m = V[:,:m].dot(y_m)
+        return x_m, y_m
+    else:
         # If not, applying Given's rotations
         R_m, g_m = givens_rotations(H, m, beta)
         y_m = np.linalg.solve(R_m, g_m)
         x_m = V[:,:m].dot(y_m)
         return x_m, y_m
-    else:
-        # Solves exact solution
-        y_m = np.linalg.solve(H[:m,:m], betae[:m])
-        x_m = V[:,:m].dot(y_m)
-        return x_m, y_m
-
 
 
 A = scipy.io.mmread('add32.mtx')
