@@ -29,7 +29,7 @@ def five_point(N):
 #A = five_point(3)
 #print(A)
 
-def rhs(N):
+def calc_rhs(N):
     N2 = N**2
 
     p = np.zeros((N2, 2))
@@ -52,7 +52,7 @@ def rhs(N):
     b = np.reshape(b, (N, N))
     return b
 
-print(rhs(5))
+#print(rhs(5))
 
 
 #Just a test function
@@ -73,13 +73,21 @@ def plot_mesh(N):
     plt.ylabel('y')
     plt.show()
 
-plot_mesh(10)
+#plot_mesh(10)
 
 
 def solve_direct(rhs):
     """
     Insert code for solving the 2D poisson problem with right hand side rhs directly
     """
+    N = int(np.sqrt(rhs.shape[0]))
+    print('Last N', N)
+    A = five_point(N)
+    print(A.shape[0])
+    print(rhs.shape[0])
+    u = np.linalg.solve(A, rhs)
+    print('u solution', u)
+    return u
 
 def jacobi(u0, rhs, w, nu):
     """
@@ -88,40 +96,72 @@ def jacobi(u0, rhs, w, nu):
     w: Weights
     nu: Number of presmoothings
     """
+    print('in jacobi')
 
     # Initializing variables
     N2 = u0.shape[0]
+    print(N2)
     N = int(np.sqrt(N2))
+    print(N)
     nu = nu + 1
 
     I = np.eye(N2)
     A = five_point(N)
+
+    print('I', I.shape[0])
+    print('A', A.shape[0])
+
     Jw = I - 1/4 * w * A
+
+    print('Jw', Jw.shape[0])
+    print('rhs', rhs.shape[0])
+    z =  w * 1/4 * I * rhs
+    print(I.shape[0])
 
     # Calculating the weighted Jacobi iteration
     u = Jw.dot(u0) + w * 1/4 * I * rhs
 
     return u, nu
 
-b = rhs(4)
-u0 = np.random.rand(4,4)
-u, nu = jacobi(u0, b, 4/5, 1)
-print(u)
+#b = calc_rhs(4)
+#A = five_point(2)
+#u0 = np.random.rand(4,4)
+#print(u0)
+#u, nu = jacobi(u0, b, 4/5, 1)
+#print(u)
 
 def residual(u,rhs):
-    """
-    Insert code for calculating the residual
-    """
+    # Calculating the residual
+    # Make sure they are of the same dimension!
+    # rhs ~ RN2
+    # u ~ R^N2xN2
+    N2 = u.shape[0]
+    N = int(np.sqrt(N2))
+    A = five_point(N)
+    return rhs - A.dot(u)
 
 def restriction(rh):
     """
-    Insert code for restricting to coarser grid
+    Restricting to coarser grid
     """
+    print('in restriction')
+    N = int(np.sqrt(rh.shape[0]))
+    print('N', N)
+    #print('N', N)
+    #return np.eye(N).dot(rh)
+    return calc_rhs((N-1)**2)
 
-def interpolation(d2h):
+def interpolation(u, d2h):
     """
-    Insert code for interpolating to finer grid
+    Interpolating to finer grid
     """
+    print('In interpolation')
+    #N = int((np.sqrt(u.shape[0])+1)**2)
+    N = u.shape[0]
+    print('u shape', u.shape[0])
+    print('N', N)
+    print('d2h', d2h)
+    return u + np.eye(N).dot(d2h)
 
 def mgv(u0, rhs, nu1, nu2, level, max_level):
     """
@@ -137,22 +177,37 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
            level      - current level
            max_level  - total number of levels
     """
-    if level == max_level:
+    if level == max_level or u0.shape[0] == 4:
         """
         Solve small problem exactly
         """
         return solve_direct(rhs)
     else:
-        Nh = u0.shape[0] + 1
+        print('\n in mgv \n')
+        Nh = u0.shape[0] #+ 1
+
         u, nu1 = jacobi(u0, rhs, 0.8, nu1)
+        print('u.shape', u.shape[0])
 
         rh = residual(u, rhs)
         r2h = restriction(rh)
 
-        N2h = Nh // 2
-        d2h = mgv(np.zeros((N2h-1, N2h-1)), r2h, nu1, nu2, level + 1, max_level)
-        dh = interpolation(d2h)
+       # N2h = Nh // 2       # i.e. math.floor(Nh/2)
+        N2h = int((np.sqrt(Nh)-1)**2)
+        print('N2h', N2h)
 
-        u = u + dh
+        print('N2h', N2h)
+        d2h = mgv(np.zeros((N2h, N2h)), r2h, nu1, nu2, level + 1, max_level)
+
+        u = interpolation(u, d2h)
+
         u = jacobi(u, rhs, 0.8, nu2)
     return u
+
+N = 81 # Husk at dette må være et kvadratisk tall
+u0 = np.random.rand(N, N)
+rhs = calc_rhs(N)
+nu1 = 0
+nu2 = 0
+
+print(mgv(u0, rhs, nu1, nu2, level=0, max_level=10))
