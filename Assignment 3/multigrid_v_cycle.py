@@ -1,4 +1,9 @@
 import numpy as np
+import math
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # For 3-d plot
+from matplotlib import cm
+
 
 def five_point(N):
     u = np.eye(N**2)
@@ -23,6 +28,53 @@ def five_point(N):
 
 #A = five_point(3)
 #print(A)
+
+def rhs(N):
+    N2 = N**2
+
+    p = np.zeros((N2, 2))
+    for i in range(1, N2):
+        p[i, 0] = (i % N)/(N-1)
+        p[i, 1] = math.floor(i/N)/(N-1)
+
+    f = lambda x,y: math.sin(x*y)
+
+    b = np.zeros(N2)
+    for i in range(N2):
+        b[i] = f(p[i,0], p[i,1])
+
+    # Boundary conditions
+    b[0:N] = 0                  # y=0
+    b[N2-N:N2] = 0              # y=1
+    b[0:N2:N] = 0               # x=0
+    b[N-1:N2:N] = 0             # x=1
+
+    b = np.reshape(b, (N, N))
+    return b
+
+print(rhs(5))
+
+
+#Just a test function
+def plot_mesh(N):
+    b = rhs(N)
+
+    x = np.linspace(0,1,N)
+    y = np.linspace(0,1,N)
+
+    fig = plt.figure(1)
+    plt.clf()
+    ax = fig.gca(projection='3d')
+    X,Y = np.meshgrid(x, y)
+    print(X)
+    ax.plot_surface(X, Y, b, cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
+    ax.view_init(azim=30)              # Rotate the figure
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.show()
+
+plot_mesh(10)
+
 
 def solve_direct(rhs):
     """
@@ -51,9 +103,9 @@ def jacobi(u0, rhs, w, nu):
 
     return u, nu
 
-f = lambda x,y: np.sin(x*y)
+b = rhs(4)
 u0 = np.random.rand(4,4)
-u, nu = jacobi(u0, f, 4/5, 1)
+u, nu = jacobi(u0, b, 4/5, 1)
 print(u)
 
 def residual(u,rhs):
