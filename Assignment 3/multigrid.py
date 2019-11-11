@@ -1,5 +1,6 @@
 import numpy as np
 import math
+np.set_printoptions(linewidth=500)
 
 def lhs(u):
     Au = 4 * u
@@ -12,8 +13,9 @@ def lhs(u):
 def solve_direct(rhs):
     """
     Insert code for solving the 2D poisson problem with right hand side rhs directly
-    Remember to ad boundary conditions!!
+    Remember to add boundary conditions!!
     """
+    
 
 def jacobi(u0, rhs, w, nu):
     # Initializing variables
@@ -27,6 +29,7 @@ def jacobi(u0, rhs, w, nu):
 def residual(u,rhs):
     return rhs - lhs(u)
 
+
 def restriction(rh):
     """
     rh: residual matrix
@@ -34,7 +37,7 @@ def restriction(rh):
     h = rh.shape[0]     # Original grid size
     H = (h+1)/2 - 1     # New coarser grid size
 
-    ## Checks if H is a whole number
+    # Checks if H is a whole number
     if H.is_integer():
         H = int(H)
     else:
@@ -57,12 +60,13 @@ def restriction(rh):
         cols = rectangle[:, 2*i:2*i+3]
         rH[:,i] += (cols[:,0] + 2*cols[:,1] + cols[:,2])/H
 
-    print(rectangle)
+    #print(rectangle)
     print(rH)
 
 
-rh = np.eye(5)
-restriction(rh)
+rh = np.random.rand(4,4)
+print(rh, '\n')
+#restriction(rh)
 
 def interpolation(d2h):
     """
@@ -73,13 +77,43 @@ def interpolation(d2h):
 
     # Initializing the finer matrix
     d2 = np.zeros((h, h))
+    for i in range(1,H+1):
+        # Initializing variables
+        row = d2[2*i-1,:]
+        row[1::2] = d2h[i-1,:]           # Hvorfor funker dette?
+        col = d2[:, 2*i-1]
+        col[1::2] = d2h[:,i-1]
 
-    
+        # Finding averages for the rows
+        small_row = row[1::2]
+        row[2:-2:2] = [(a+b)/2 for a, b in zip(small_row[::], small_row[1::])]
+
+        # Finding averages for the columns
+        small_col = col[1::2]
+        col[2:-2:2] = [(a+b)/2 for a, b in zip(small_col[::], small_col[1::])]
+
+    for i in range(H):
+        # Finding averages for the midpoints
+        midpoint_row = d2[2*i,:]
+        upper_row = d2[2*i-1,:]
+        lower_row = d2[2*i+1,:]
+        small_upper_row = upper_row[1::2]
+        small_lower_row = lower_row[1::2]
+        midpoint_row[2:-2:2] = [(a+b+c+d)/4 for a, b, c, d in zip(small_upper_row[::], small_upper_row[1::], small_lower_row[::], small_lower_row[1::])]
+
+    d2[0, :] = d2[1, :] / 2
+    d2[-1, :] = d2[-2, :] / 2
+    d2[:, 0] = d2[:, 1] / 2
+    d2[:, -1] = d2[:, -2] / 2
+
+    print(d2)
+
+    return d2
+
+interpolation(rh)
 
 
-
-
-def mgv(u0, rhs,nu1, nu2, level, max_level):
+def mgv(u0, rhs, nu1, nu2, level, max_level):
     """
     mgv(u0, rhs, nu1, nu2, level, max_level)
     performs one multi-grid V-cycle for the 2D Poisson problem
