@@ -1,6 +1,10 @@
 import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # For 3-d plot
+from matplotlib import cm
+
 np.set_printoptions(linewidth=500)
 
 def lhs(u):
@@ -40,15 +44,24 @@ def solve_direct(rhs):
     Remember to add boundary conditions!!
     """
     print('solve')
+    print(rhs)
     if rhs.shape[0] == 1:
         return rhs/4
     else:
+        rhs[0,:] = 0
+        rhs[-1,:] = 0
+        rhs[:,0] = 0
+        rhs[:,-1] = 0
         rhs = np.asarray(rhs).reshape(-1)
         N = rhs.shape[0]
         n = int(np.sqrt(N))
         A = sparse.csr_matrix(five_point(int(n)))
-        u = spsolve(A,rhs)
-        return u.reshape((n,n))
+        u = (spsolve(A,rhs)).reshape((n,n))
+        #u[0,:] = 0
+        #u[-1,:] = 0
+        #u[:,0] = 0
+        #u[:,-1] = 0
+        return u
 
 
 #rh = np.random.rand(4,4)
@@ -84,7 +97,8 @@ def restriction(rh):
     if H.is_integer():
         H = int(H)
     else:
-        print('error as H is', H)
+        print('\nerror as H is', H, '\n')
+        #u = solve_direct(rh)
         return 0
 
     # Initializing smaller grid
@@ -122,9 +136,7 @@ def interpolation(d2h):
 
     # Initializing the finer matrix
     d2 = np.zeros((h, h))
-    print('h', h)
-    print('H', H)
-    print(d2h)
+
     for i in range(1,H+1):
         # Initializing variables
         row = d2[2*i-1,:]
@@ -194,9 +206,40 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
         u = jacobi(u, rhs, 0.8, nu2)
     return u
 
-N = 319
-u0 = np.zeros((N,N))
-rhs = np.random.rand(N,N)
-print('rhs', rhs)
-u = mgv(u0, rhs, 5, 5, 0, 4)
-print(u)
+
+f = lambda x,y: np.sin(x*y)
+g = lambda x,y: -(x**2 + y**2) * np.sin(x*y)
+
+N = 639
+
+rhs = np.zeros((N,N))
+u_exact = np.zeros((N,N))
+
+x = np.linspace(0,1,N)
+y = np.linspace(0,1,N)
+for i in range(N):
+    for j in range(N):
+        rhs[i,j] = f(x[i],y[j])
+        u_exact[i,j] = g(x[i], y[j])
+
+
+u0 = np.zeros((N,N))#np.random.rand(N,N)
+
+u = mgv(u0, rhs, 5, 5, 0, 7)
+
+def plot_figures(u, u_exact):
+    title = ['caluclated u', 'exact u', 'error']
+    us = [-u, u_exact, -u-u_exact]
+    for i in range(3):
+        fig = plt.figure(i)
+        plt.clf()
+        ax = fig.gca(projection='3d')
+        X,Y = np.meshgrid(x, y)
+        ax.plot_surface(X, Y, us[i], cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
+        ax.view_init(azim=30)              # Rotate the figure
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.title(title[i])
+    plt.show()
+
+plot_figures(u, u_exact)
