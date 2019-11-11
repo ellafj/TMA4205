@@ -1,8 +1,10 @@
 import numpy as np
-import math
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
 np.set_printoptions(linewidth=500)
 
 def lhs(u):
+    print('lhs')
     Au = 4 * u
     Au[1:,:] = Au[1:,:] - u[:-1,:]
     Au[:-1,:] = Au[:-1,:] - u[1:,:]
@@ -10,23 +12,63 @@ def lhs(u):
     Au[:,:-1] = Au[:,:-1] - u[:,1:]
     return Au
 
+def five_point(N):
+     print('five-point')
+     u = np.eye(N**2)
+     Au = 4 * u
+
+     Au[:,:-N] = Au[:,:-N] - u[:,N:]
+     Au[:-N,:] = Au[:-N,:] - u[N:,:]
+
+     diag = np.ones(N)
+     diag[-1] = 0
+     np.fill_diagonal(u, diag)
+
+     Au[1:,:] = Au[1:,:] - u[:-1,:]
+
+     diag = np.ones(N)
+     diag[0] = 0
+     np.fill_diagonal(u, diag)
+
+     Au[:-1,:] = Au[:-1,:] - u[1:,:]
+
+     return -Au
+
 def solve_direct(rhs):
     """
     Insert code for solving the 2D poisson problem with right hand side rhs directly
     Remember to add boundary conditions!!
     """
-    
+    print('solve')
+    if rhs.shape[0] == 1:
+        return rhs/4
+    else:
+        rhs = np.asarray(rhs).reshape(-1)
+        N = rhs.shape[0]
+        n = int(np.sqrt(N))
+        A = sparse.csr_matrix(five_point(int(n)))
+        u = spsolve(A,rhs)
+        return u.reshape((n,n))
+
+
+#rh = np.random.rand(4,4)
+#solve_direct(rh)
+
 
 def jacobi(u0, rhs, w, nu):
+    print('jacobi')
     # Initializing variables
+    rhs = rhs
     n = u0.shape[0]
     Au = lhs(u0)
+    nu = nu + 1
 
     # Calculating u_{j+1} = (I - 1/4 w A)u_j + f_w
     return np.eye(n).dot(u0) - 1/4 * w * Au + rhs
 
 
 def residual(u,rhs):
+    print('residual')
     return rhs - lhs(u)
 
 
@@ -34,6 +76,7 @@ def restriction(rh):
     """
     rh: residual matrix
     """
+    print('restriction')
     h = rh.shape[0]     # Original grid size
     H = (h+1)/2 - 1     # New coarser grid size
 
@@ -41,7 +84,7 @@ def restriction(rh):
     if H.is_integer():
         H = int(H)
     else:
-        print('error')
+        print('error as H is', H)
         return 0
 
     # Initializing smaller grid
@@ -60,23 +103,28 @@ def restriction(rh):
         cols = rectangle[:, 2*i:2*i+3]
         rH[:,i] += (cols[:,0] + 2*cols[:,1] + cols[:,2])/H
 
-    #print(rectangle)
-    print(rH)
+    #print('rectangle', rectangle)
+    #print('rh', rh)
+    return rH
 
 
-rh = np.random.rand(4,4)
-print(rh, '\n')
+#rh = np.random.rand(4,4)
+#print(rh, '\n')
 #restriction(rh)
 
 def interpolation(d2h):
     """
     d2h: u in coarse matrix
     """
+    print('interpolation')
     H = d2h.shape[0]
     h = 2*(H+1)-1
 
     # Initializing the finer matrix
     d2 = np.zeros((h, h))
+    print('h', h)
+    print('H', H)
+    print(d2h)
     for i in range(1,H+1):
         # Initializing variables
         row = d2[2*i-1,:]
@@ -106,11 +154,11 @@ def interpolation(d2h):
     d2[:, 0] = d2[:, 1] / 2
     d2[:, -1] = d2[:, -2] / 2
 
-    print(d2)
+    #print(d2)
 
     return d2
 
-interpolation(rh)
+#interpolation(rh)
 
 
 def mgv(u0, rhs, nu1, nu2, level, max_level):
@@ -127,6 +175,7 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
            level      - current level
            max_level  - total number of levels
     """
+    print('mgv')
     if level == max_level:
         """
         Solve small problem exactly
@@ -134,12 +183,20 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
         return solve_direct(rhs)
     else:
         Nh = u0.shape[0]+1
-        u = jacobi(u0, rhs, 0.8,nu1)
+        u = jacobi(u0, rhs, 0.8, nu1)
         rh = residual(u, rhs)
         r2h = restriction(rh)
         N2h = Nh//2
+        #print('rh', r2h)
         d2h = mgv(np.zeros((N2h-1,N2h-1)), r2h, nu1, nu2, level+1, max_level)
         dh = interpolation(d2h)
         u = u + dh
         u = jacobi(u, rhs, 0.8, nu2)
     return u
+
+N = 319
+u0 = np.zeros((N,N))
+rhs = np.random.rand(N,N)
+print('rhs', rhs)
+u = mgv(u0, rhs, 5, 5, 0, 4)
+print(u)
