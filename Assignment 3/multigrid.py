@@ -8,7 +8,6 @@ from matplotlib import cm
 np.set_printoptions(linewidth=500)
 
 def lhs(u):
-    print('lhs')
     Au = 4 * u
     Au[1:,:] = Au[1:,:] - u[:-1,:]
     Au[:-1,:] = Au[:-1,:] - u[1:,:]
@@ -17,7 +16,6 @@ def lhs(u):
     return Au
 
 def five_point(N):
-     print('five-point')
      u = np.eye(N**2)
      Au = 4 * u
 
@@ -39,28 +37,14 @@ def five_point(N):
      return -Au
 
 def solve_direct(rhs):
-    """
-    Insert code for solving the 2D poisson problem with right hand side rhs directly
-    Remember to add boundary conditions!!
-    """
-    print('solve')
-    print(rhs)
     if rhs.shape[0] == 1:
         return rhs/4
     else:
-        rhs[0,:] = 0
-        rhs[-1,:] = 0
-        rhs[:,0] = 0
-        rhs[:,-1] = 0
         rhs = np.asarray(rhs).reshape(-1)
         N = rhs.shape[0]
         n = int(np.sqrt(N))
         A = sparse.csr_matrix(five_point(int(n)))
         u = (spsolve(A,rhs)).reshape((n,n))
-        #u[0,:] = 0
-        #u[-1,:] = 0
-        #u[:,0] = 0
-        #u[:,-1] = 0
         return u
 
 
@@ -69,19 +53,21 @@ def solve_direct(rhs):
 
 
 def jacobi(u0, rhs, w, nu):
-    print('jacobi')
+
     # Initializing variables
     rhs = rhs
     n = u0.shape[0]
     Au = lhs(u0)
-    nu = nu + 1
 
     # Calculating u_{j+1} = (I - 1/4 w A)u_j + f_w
-    return np.eye(n).dot(u0) - 1/4 * w * Au + rhs
+    for i in range(nu):
+        #u0 = np.eye(n).dot(u0) - 1/4 * w * Au + rhs
+        u0 = u0 + (w * 0.25) * (rhs - lhs(u0))
+
+    return u0
 
 
 def residual(u,rhs):
-    print('residual')
     return rhs - lhs(u)
 
 
@@ -89,7 +75,6 @@ def restriction(rh):
     """
     rh: residual matrix
     """
-    print('restriction')
     h = rh.shape[0]     # Original grid size
     H = (h+1)/2 - 1     # New coarser grid size
 
@@ -130,7 +115,6 @@ def interpolation(d2h):
     """
     d2h: u in coarse matrix
     """
-    print('interpolation')
     H = d2h.shape[0]
     h = 2*(H+1)-1
 
@@ -166,11 +150,38 @@ def interpolation(d2h):
     d2[:, 0] = d2[:, 1] / 2
     d2[:, -1] = d2[:, -2] / 2
 
-    #print(d2)
-
     return d2
 
 #interpolation(rh)
+
+def plot_residual(u, rhs, N):
+    res = residual(u, rhs)
+    x = np.linspace(0,1,N)
+    y = np.linspace(0,1,N)
+    fig = plt.figure(1)
+    plt.clf()
+    ax = fig.gca(projection='3d')
+    X,Y = np.meshgrid(x, y)
+    ax.plot_surface(X, Y, res, cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
+    ax.view_init(azim=30)              # Rotate the figure
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('residuals')
+    plt.show()
+
+def plot_figure(u, N):
+    x = np.linspace(0,1,N)
+    y = np.linspace(0,1,N)
+    fig = plt.figure(1)
+    plt.clf()
+    ax = fig.gca(projection='3d')
+    X,Y = np.meshgrid(x, y)
+    ax.plot_surface(X, Y, lhs(u), cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
+    ax.view_init(azim=30)              # Rotate the figure
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('calculated u')
+
 
 
 def mgv(u0, rhs, nu1, nu2, level, max_level):
@@ -187,7 +198,6 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
            level      - current level
            max_level  - total number of levels
     """
-    print('mgv')
     if level == max_level:
         """
         Solve small problem exactly
@@ -200,46 +210,62 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
         r2h = restriction(rh)
         N2h = Nh//2
         #print('rh', r2h)
+        #plot_residual(u, rhs, u0.shape[0])
         d2h = mgv(np.zeros((N2h-1,N2h-1)), r2h, nu1, nu2, level+1, max_level)
         dh = interpolation(d2h)
         u = u + dh
         u = jacobi(u, rhs, 0.8, nu2)
+        #if level == 0:
+            #plot_residual(u, rhs, u.shape[0])
+            #plot_figure(u, u.shape[0])
     return u
 
-
+"""
 f = lambda x,y: np.sin(x*y)
-g = lambda x,y: -(x**2 + y**2) * np.sin(x*y)
 
-N = 639
+N = 31
 
 rhs = np.zeros((N,N))
-u_exact = np.zeros((N,N))
 
 x = np.linspace(0,1,N)
 y = np.linspace(0,1,N)
 for i in range(N):
     for j in range(N):
         rhs[i,j] = f(x[i],y[j])
-        u_exact[i,j] = g(x[i], y[j])
 
+"""
+#u0 = np.zeros((N,N))
+#u0 = np.random.rand(N,N)
 
-u0 = np.zeros((N,N))#np.random.rand(N,N)
+#u = mgv(u0, rhs, 20, 20, 0, 2)
 
-u = mgv(u0, rhs, 5, 5, 0, 7)
+def main(L, nu1, nu2, tol, max_iter):
+    f = lambda x,y: np.sin(x*y)
+    N = 2**L-1
+    x = np.linspace(0,1,N)
+    y = np.linspace(0,1,N)
+    rhs = np.zeros((N,N))
+    u = np.random.rand(N,N)
 
-def plot_figures(u, u_exact):
-    title = ['caluclated u', 'exact u', 'error']
-    us = [-u, u_exact, -u-u_exact]
-    for i in range(3):
-        fig = plt.figure(i)
-        plt.clf()
-        ax = fig.gca(projection='3d')
-        X,Y = np.meshgrid(x, y)
-        ax.plot_surface(X, Y, us[i], cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
-        ax.view_init(azim=30)              # Rotate the figure
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.title(title[i])
+    for i in range(N):
+        for j in range(N):
+            rhs[i,j] = f(x[i],y[j])
+
+    r0 = np.linalg.norm(residual(u, rhs), 2)
+    r = r0
+    iterations = 0
+
+    while r/r0 > tol and max_iter > iterations:
+        u = mgv(u, rhs, nu1, nu2, 0, L-1)
+        r = np.linalg.norm(residual(u, rhs), 2)
+        print(iterations)
+        print(r/r0)
+        iterations += 1
+
+    plot_residual(u, rhs, N)
+    plot_figure(u, N)
     plt.show()
 
-plot_figures(u, u_exact)
+
+main(5, 5, 5, 10E-12, 5)
+
