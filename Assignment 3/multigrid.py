@@ -154,34 +154,29 @@ def interpolation(d2h):
 
 #interpolation(rh)
 
-def plot_residual(u, rhs, N):
+
+def plot(u, rhs, N, iterations):
+    x = np.linspace(0,1,N)
+    y = np.linspace(0,1,N)
+    X,Y = np.meshgrid(x, y)
+
     res = residual(u, rhs)
-    x = np.linspace(0,1,N)
-    y = np.linspace(0,1,N)
-    fig = plt.figure(1)
-    plt.clf()
-    ax = fig.gca(projection='3d')
-    X,Y = np.meshgrid(x, y)
+
+    fig = plt.figure(figsize=plt.figaspect(0.3))
+
+    ax = fig.add_subplot(1, 2, 1, projection='3d')
+    ax.plot_surface(X, Y, u, cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
+    ax.view_init(azim=10)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.title('Solution After %d Cycle(s)' % iterations)
+
+    ax = fig.add_subplot(1, 2, 2, projection='3d')
     ax.plot_surface(X, Y, res, cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
-    ax.view_init(azim=30)              # Rotate the figure
+    ax.view_init(azim=10)
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.title('residuals')
-    plt.show()
-
-def plot_figure(u, N):
-    x = np.linspace(0,1,N)
-    y = np.linspace(0,1,N)
-    fig = plt.figure(1)
-    plt.clf()
-    ax = fig.gca(projection='3d')
-    X,Y = np.meshgrid(x, y)
-    ax.plot_surface(X, Y, lhs(u), cmap=cm.coolwarm, rstride=1, cstride=1, linewidth=0)
-    ax.view_init(azim=30)              # Rotate the figure
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('calculated u')
-
+    plt.title('Residual After %d Cycle(s)' % iterations)
 
 
 def mgv(u0, rhs, nu1, nu2, level, max_level):
@@ -209,37 +204,15 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
         rh = residual(u, rhs)
         r2h = restriction(rh)
         N2h = Nh//2
-        #print('rh', r2h)
-        #plot_residual(u, rhs, u0.shape[0])
         d2h = mgv(np.zeros((N2h-1,N2h-1)), r2h, nu1, nu2, level+1, max_level)
         dh = interpolation(d2h)
         u = u + dh
         u = jacobi(u, rhs, 0.8, nu2)
-        #if level == 0:
-            #plot_residual(u, rhs, u.shape[0])
-            #plot_figure(u, u.shape[0])
     return u
 
-"""
-f = lambda x,y: np.sin(x*y)
 
-N = 31
 
-rhs = np.zeros((N,N))
-
-x = np.linspace(0,1,N)
-y = np.linspace(0,1,N)
-for i in range(N):
-    for j in range(N):
-        rhs[i,j] = f(x[i],y[j])
-
-"""
-#u0 = np.zeros((N,N))
-#u0 = np.random.rand(N,N)
-
-#u = mgv(u0, rhs, 20, 20, 0, 2)
-
-def main(L, nu1, nu2, tol, max_iter):
+def task1a(L, nu1, nu2, tol, max_iter):
     f = lambda x,y: np.sin(x*y)
     N = 2**L-1
     x = np.linspace(0,1,N)
@@ -255,17 +228,45 @@ def main(L, nu1, nu2, tol, max_iter):
     r = r0
     iterations = 0
 
+    plot(u, rhs, N, iterations)
+
     while r/r0 > tol and max_iter > iterations:
         u = mgv(u, rhs, nu1, nu2, 0, L-1)
         r = np.linalg.norm(residual(u, rhs), 2)
-        print(iterations)
-        print(r/r0)
         iterations += 1
+        plot(u, rhs, N, iterations)
 
-    plot_residual(u, rhs, N)
-    plot_figure(u, N)
     plt.show()
 
 
-main(5, 5, 5, 10E-12, 5)
+#task1a(5, 5, 5, 10E-12, 5)
 
+def task1b(nu1, nu2, tol, max_iter):
+    f = lambda x,y: np.sin(x*y)
+    L = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    for l in L:
+        N = 2**l-1
+        x = np.linspace(0,1,N)
+        y = np.linspace(0,1,N)
+        rhs = np.zeros((N,N))
+        u = np.random.rand(N,N)
+
+        for i in range(N):
+            for j in range(N):
+                rhs[i,j] = f(x[i],y[j])
+
+        r0 = np.linalg.norm(residual(u, rhs), 2)
+        r = r0
+        iterations = 0
+
+        while r/r0 > tol and max_iter > iterations:
+            u = mgv(u, rhs, nu1, nu2, 0, l-1)
+            r = np.linalg.norm(residual(u, rhs), 2)
+            iterations += 1
+
+        plot(u, rhs, N, iterations)
+
+        plt.show()
+
+task1b(5,5,10E-12,20)
