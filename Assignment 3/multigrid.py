@@ -194,9 +194,6 @@ def mgv(u0, rhs, nu1, nu2, level, max_level):
            max_level  - total number of levels
     """
     if level == max_level:
-        """
-        Solve small problem exactly
-        """
         return solve_direct(rhs)
     else:
         Nh = u0.shape[0]+1
