@@ -124,7 +124,7 @@ def interpolation(d2h):
     for i in range(1,H+1):
         # Initializing variables
         row = d2[2*i-1,:]
-        row[1::2] = d2h[i-1,:]           # Hvorfor funker dette?
+        row[1::2] = d2h[i-1,:]
         col = d2[:, 2*i-1]
         col[1::2] = d2h[:,i-1]
 
